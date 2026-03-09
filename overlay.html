@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScreenExplain Quick Mode</title>
+  <link rel="stylesheet" href="./overlay.css">
+</head>
+<body>
+  <div class="overlay-root">
+    <div class="instruction">
+      드래그해서 답변받을 영역을 선택하세요. 취소는 <kbd>Esc</kbd>
+    </div>
+    <div id="selectionBox" class="selection-box" hidden></div>
+    <div id="loadingBadge" class="loading-badge" hidden>분석 중...</div>
+    <div id="subtitleBubble" class="subtitle-bubble" hidden></div>
+  </div>
+  <script src="./overlay.js"></script>
+</body>
+</html>

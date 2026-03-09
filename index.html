@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScreenExplain</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell dashboard-layout">
+    <section class="main-column">
+      <section class="panel card">
+        <div class="section-header">
+          <h2>OpenAI 연결</h2>
+          <span id="apiKeyBadge" class="pill pill-idle">미설정</span>
+        </div>
+        <label class="stack">
+          <span class="label">API 키</span>
+          <input id="apiKeyInput" type="password" placeholder="sk-...">
+        </label>
+        <p id="apiKeyHint" class="hint">키는 현재 Windows 사용자 기준으로 로컬에 암호화 저장됩니다.</p>
+        <div class="action-row">
+          <button id="saveApiKeyButton" class="primary-button" type="button">키 저장</button>
+          <button id="testApiKeyButton" class="ghost-button" type="button">연결 테스트</button>
+          <button id="clearApiKeyButton" class="text-button" type="button">삭제</button>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <div class="section-header">
+          <h2>간편 답변 모드</h2>
+          <span id="quickModeBadge" class="pill pill-idle">꺼짐</span>
+        </div>
+        <p class="hint">
+          앱의 기본 사용 방식입니다. 실행 후 트레이에 상주하며 <code>Ctrl+Shift+S</code>로 현재 모니터에서 드래그 선택 후
+          짧은 자막 답변을 받고, <code>Ctrl+Shift+M</code>나 트레이 아이콘 클릭으로 메인 창을 다시 엽니다.
+        </p>
+        <div class="status-row">
+          <span id="serverStatus" class="pill pill-warn">서버 확인 전</span>
+        </div>
+        <div class="action-row">
+          <button id="enableQuickModeButton" class="primary-button" type="button">간편 모드 켜기</button>
+          <button id="startQuickCaptureButton" class="ghost-button" type="button">지금 바로 선택</button>
+        </div>
+        <p id="captionOverlay" class="hint">
+          기존 상세 분석 모드는 제거되었습니다. 이 창은 간편 모드 설정과 기록 확인용입니다.
+        </p>
+        <p id="quickModeHint" class="hint">드래그한 영역을 기준으로 짧은 설명을 말풍선처럼 표시합니다.</p>
+      </section>
+
+      <section class="panel card">
+        <div class="section-header">
+          <h2>저장 프롬프트</h2>
+          <span id="promptBadge" class="pill pill-idle">기본값 사용</span>
+        </div>
+        <label class="stack">
+          <span class="label">캡처와 함께 사용할 분석 지시</span>
+          <textarea id="savedPromptInput" rows="6" placeholder="비워두면 화면 핵심 설명용 기본 프롬프트를 자동 사용합니다."></textarea>
+        </label>
+        <div class="action-row">
+          <button id="savePromptButton" class="primary-button" type="button">저장</button>
+          <span id="promptHint" class="busy-text"></span>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <div class="section-header">
+          <h2>모델</h2>
+          <span id="modelBadge" class="pill pill-idle">불러오는 중</span>
+        </div>
+        <label class="stack">
+          <span class="label">추천 모델</span>
+          <select id="modelSelect"></select>
+        </label>
+        <label class="stack">
+          <span class="label">직접 입력할 모델 ID</span>
+          <input id="customModelInput" type="text" placeholder="예: gpt-4.1-mini">
+        </label>
+        <div class="action-row">
+          <button id="saveModelButton" class="primary-button" type="button">모델 적용</button>
+          <span id="modelMeta" class="busy-text"></span>
+        </div>
+      </section>
+
+      <section class="panel card">
+        <div class="section-header">
+          <h2>토큰 통계</h2>
+          <span id="usageModelName" class="pill pill-idle">미실행</span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-label">입력 토큰</span>
+            <strong id="inputTokensValue" class="stat-value">-</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">출력 토큰</span>
+            <strong id="outputTokensValue" class="stat-value">-</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">총 토큰</span>
+            <strong id="totalTokensValue" class="stat-value">-</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">남은 컨텍스트</span>
+            <strong id="remainingTokensValue" class="stat-value">-</strong>
+          </div>
+        </div>
+        <p id="usageHint" class="hint">남은 컨텍스트는 모델 문서의 컨텍스트 윈도우 기준 추정치입니다.</p>
+      </section>
+    </section>
+
+    <aside class="history-column">
+      <section class="panel card history-card">
+        <div class="history-header">
+          <h2>최근 답변</h2>
+          <button id="clearHistoryButton" class="text-button" type="button">지우기</button>
+        </div>
+        <ol id="historyList" class="history-list"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <template id="historyItemTemplate">
+    <li class="history-item">
+      <p class="history-question"></p>
+      <p class="history-answer"></p>
+      <p class="history-meta"></p>
+      <time class="history-time"></time>
+    </li>
+  </template>
+
+  <script src="./app.js" type="module"></script>
+</body>
+</html>

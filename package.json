@@ -1,0 +1,53 @@
+{
+  "name": "screen-explain",
+  "version": "0.1.0",
+  "author": "OpenAI Codex",
+  "description": "Desktop screen explanation assistant powered by OpenAI vision.",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:web": "node server.js",
+    "dist": "electron-builder --win portable",
+    "dist:portable": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.screenexplain.desktop",
+    "productName": "ScreenExplain",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "!**/.local/**",
+      "app.js",
+      "assets/**/*",
+      "electron-main.js",
+      "index.html",
+      "overlay-preload.js",
+      "overlay.css",
+      "overlay.html",
+      "overlay.js",
+      "preload.js",
+      "secure-store.js",
+      "server.js",
+      "styles.css",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/app-icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false
+    }
+  }
+}
