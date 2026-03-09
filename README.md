@@ -1,59 +1,90 @@
 # ScreenExplain
 
-현재 모니터 화면이나 개별 창을 선택해서 공유하고, 그 화면에 대해 질문하면 AI가 자막처럼 설명해 주는 로컬 데스크톱 MVP입니다.
+ScreenExplain is a Windows desktop app for quick on-screen AI help.
 
-## 기능
+The app is built around `quick mode`:
+- stays available from the system tray
+- captures a dragged region on the current monitor
+- shows a short answer bubble near the selected area
+- stores recent answers in the settings panel
 
-- 현재 화면 공유
-- 화면/창 선택
-- 현재 프레임 캡처
-- 질문 입력 후 OpenAI 비전 분석
-- 간편 답변 모드: 백그라운드 대기 후 드래그 영역 즉답
-- 화면 위 자막 오버레이 표시
-- 현재 모델 확인 및 변경
-- 입력/출력/총 토큰과 남은 컨텍스트 추정 표시
-- 최근 답변 기록
+## Current Product Shape
 
-## 실행
+- Quick mode is the default workflow.
+- The main window is now a settings and history panel.
+- Old manual screen-share / detailed analysis flow has been removed.
 
-1. 패키지를 설치합니다.
+## Main Features
+
+- System tray based quick mode
+- Global shortcut capture: `Ctrl+Shift+S`
+- Return to main panel: `Ctrl+Shift+M`
+- Region-based answer bubble overlay
+- Saved prompt applied to every capture
+- OpenAI API key saved locally for the current Windows user
+- Model selection
+- Token usage summary
+- Recent answer history, including quick mode answers
+
+## Run Locally
 
 ```powershell
 npm install
-```
-
-2. 앱을 실행합니다.
-
-```powershell
 npm start
 ```
 
-## 간편 답변 모드
+## OpenAI Setup
 
-- 앱에서 `간편 모드 켜기`
-- 창이 숨겨진 상태에서 `Ctrl+Shift+S`
-- 현재 보고 있는 모니터에서 답변받을 영역 드래그
-- 자막형 짧은 답변 표시
-- `Ctrl+Shift+M`으로 메인 창 복귀
+Use the `OpenAI 연결` section inside the app:
 
-## OpenAI 연결
+1. Enter your API key
+2. Click `키 저장`
+3. Optionally click `연결 테스트`
 
-- 앱 안의 `OpenAI 연결` 섹션에 API 키 입력
-- `키 저장`
-- 필요하면 `연결 테스트`
-- 키는 현재 Windows 사용자 기준으로 로컬 암호화 저장
+The API key is stored locally using Windows user-scoped protection.
 
-## 사용 방법
+## Quick Mode
 
-1. 데스크톱 앱 실행
-2. `화면 공유 시작` 클릭
-3. 공유할 모니터 또는 창 선택
-4. 질문 입력
-5. `질문하기` 또는 `Ctrl+Enter`
+Default usage flow:
 
-## 메모
+1. Launch the app
+2. Enable quick mode if needed
+3. Press `Ctrl+Shift+S`
+4. Drag over the area you want to analyze
+5. Read the answer bubble
+6. Right-click or press `Esc` to close the overlay
 
-- 현재 버전은 Electron 기반 로컬 MVP입니다.
-- 앱 내부에서 로컬 HTTP 서버를 띄운 뒤 자체 창으로 연결합니다.
-- 서버는 `OPENAI_API_KEY`를 환경 변수에서 읽습니다.
-- 모델은 기본값으로 `gpt-4.1-mini`를 사용하며, 필요하면 `OPENAI_MODEL`로 변경할 수 있습니다.
+Quick mode answers are also written into `최근 답변`.
+
+## Saved Prompt
+
+The `저장 프롬프트` section defines the instruction that is always combined with each capture.
+
+If the saved prompt is empty, the app uses its built-in default prompt:
+
+`이 화면에서 사용자가 지금 바로 알아야 할 핵심 내용을 짧고 정확하게 설명해줘. 문제 풀이처럼 보이면 정답과 핵심 근거를 먼저 말해줘.`
+
+## Build
+
+Portable EXE:
+
+```powershell
+npm run dist:portable
+```
+
+Installer EXE:
+
+```powershell
+npm run dist:installer
+```
+
+Build outputs are created in `dist/`.
+
+## Important Local Files
+
+- `electron-main.js`: Electron main process
+- `app.js`: settings panel UI logic
+- `overlay.js`: quick mode overlay interaction
+- `server.js`: local API bridge to OpenAI Responses API
+- `secure-store.js`: encrypted local API key storage
+- `settings-store.js`: local app settings storage
