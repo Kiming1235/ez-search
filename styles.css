@@ -29,6 +29,10 @@ body {
   color: var(--text);
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(320px, 420px);
@@ -389,6 +393,82 @@ button:disabled {
   min-width: 70px;
 }
 
+.modal-shell[hidden] {
+  display: none;
+}
+
+.modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 10, 18, 0.7);
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-header {
+  align-items: flex-start;
+}
+
+.modal-header h2 {
+  margin-bottom: 8px;
+}
+
+.modal-section {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.modal-section h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.auth-advanced {
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.auth-advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.advanced-grid .stack:last-child {
+  grid-column: 1 / -1;
+}
+
 code {
   font-family: Consolas, monospace;
 }
@@ -407,6 +487,16 @@ code {
   }
 
   .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-card {
+    width: min(100vw - 20px, 760px);
+    max-height: calc(100vh - 20px);
+    padding: 16px;
+  }
+
+  .advanced-grid {
     grid-template-columns: 1fr;
   }
 }

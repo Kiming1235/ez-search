@@ -17,15 +17,21 @@ const requestNoteInput = document.getElementById("requestNoteInput");
 const requestAccessButton = document.getElementById("requestAccessButton");
 const checkRequestStatusButton = document.getElementById("checkRequestStatusButton");
 const logoutRemoteAuthButton = document.getElementById("logoutRemoteAuthButton");
+const authModal = document.getElementById("authModal");
+const authModalOpenButton = document.getElementById("authModalOpenButton");
+const authModalCloseButton = document.getElementById("authModalCloseButton");
 const modelSelect = document.getElementById("modelSelect");
 const customModelInput = document.getElementById("customModelInput");
 const savedPromptInput = document.getElementById("savedPromptInput");
+const connectionBadge = document.getElementById("connectionBadge");
+const connectionHint = document.getElementById("connectionHint");
 const promptBadge = document.getElementById("promptBadge");
 const promptHint = document.getElementById("promptHint");
 const apiKeyBadge = document.getElementById("apiKeyBadge");
 const apiKeyHint = document.getElementById("apiKeyHint");
 const remoteAuthBadge = document.getElementById("remoteAuthBadge");
 const remoteAuthHint = document.getElementById("remoteAuthHint");
+const authModalSummary = document.getElementById("authModalSummary");
 const modelBadge = document.getElementById("modelBadge");
 const quickModeBadge = document.getElementById("quickModeBadge");
 const quickModeHint = document.getElementById("quickModeHint");
@@ -58,6 +64,25 @@ const desktopBridge = window.screenExplainDesktop || null;
 function setPill(element, text, tone) {
   element.textContent = text;
   element.className = `pill ${tone}`;
+}
+
+function setAuthModalOpen(isOpen) {
+  if (!authModal) {
+    return;
+  }
+
+  authModal.hidden = !isOpen;
+  document.body.classList.toggle("modal-open", isOpen);
+
+  if (isOpen) {
+    const preferredField = requestEmailInput?.disabled ? apiKeyInput : requestEmailInput;
+    queueMicrotask(() => {
+      preferredField?.focus();
+    });
+    return;
+  }
+
+  authModalOpenButton?.focus();
 }
 
 function formatNumber(value) {
@@ -233,8 +258,87 @@ function renderRemoteAuthState(data) {
   remoteAuthHint.textContent = "이 앱에서 이름과 이메일을 입력해 승인 요청을 보내면 됩니다.";
 }
 
+function getConnectionSummary(data) {
+  const remoteConfigured = Boolean(data?.remoteApiConfigured || data?.remoteApiUrlConfigured || data?.remoteApiUrl);
+  const localConfigured = Boolean(data?.apiKeyConfigured);
+  const approvalStatus = remoteApprovalRequest?.status || "";
+  const userEmail = remoteAuthUser?.email || remoteApprovalRequest?.email || "";
+
+  if (remoteTokenKind === "user-session" && remoteAuthUser?.email) {
+    return {
+      badge: "사용 가능",
+      tone: "pill-ok",
+      hint: `${userEmail} 계정이 승인되어 바로 사용할 수 있습니다.`,
+      modal: "원격 승인과 세션 발급이 끝났습니다. 추가 설정 없이 바로 사용하면 됩니다.",
+    };
+  }
+
+  if (approvalStatus === "blocked") {
+    return {
+      badge: "차단됨",
+      tone: "pill-error",
+      hint: "이 기기는 차단 상태입니다. 관리자에게 확인하십시오.",
+      modal: "현재 요청은 차단 상태입니다. 다른 설정을 바꾸기 전에 관리자 승인을 먼저 확인해야 합니다.",
+    };
+  }
+
+  if (approvalStatus === "approved") {
+    return {
+      badge: "승인 완료",
+      tone: "pill-ok",
+      hint: "관리자 승인은 끝났습니다. 상태 확인만 누르면 사용이 시작됩니다.",
+      modal: "승인은 끝났고 세션 발급만 남았습니다. 상태 확인 버튼을 눌러 연결을 완료하십시오.",
+    };
+  }
+
+  if (approvalStatus === "pending") {
+    return {
+      badge: "승인 대기",
+      tone: "pill-warn",
+      hint: userEmail
+        ? `${userEmail} 승인 대기 중입니다. 승인 후 상태 확인만 하면 됩니다.`
+        : "승인 대기 중입니다. 관리자 승인 후 상태 확인만 하면 됩니다.",
+      modal: "이 서버는 승인 요청 방식입니다. 승인 대기 중이면 상태 확인만 주기적으로 누르면 됩니다.",
+    };
+  }
+
+  if (remoteTokenKind === "legacy") {
+    return {
+      badge: "공용 토큰",
+      tone: "pill-warn",
+      hint: "예전 공용 토큰 방식으로 연결되어 있습니다.",
+      modal: "현재는 예전 공용 토큰 방식입니다. 가능하면 승인 요청 방식으로 전환하는 편이 안전합니다.",
+    };
+  }
+
+  if (remoteConfigured) {
+    return {
+      badge: "원격 준비",
+      tone: "pill-warn",
+      hint: "원격 승인 서버가 준비되어 있습니다. 이메일로 승인 요청을 보내면 됩니다.",
+      modal: "원격 승인 서버가 연결되어 있습니다. 기본 화면에서는 이메일만 입력하고 승인 요청을 보내면 됩니다.",
+    };
+  }
+
+  if (localConfigured) {
+    return {
+      badge: "직접 연결",
+      tone: "pill-ok",
+      hint: "이 PC의 OpenAI 키로 직접 호출하도록 설정되어 있습니다.",
+      modal: "원격 승인 서버를 쓰지 않고, 이 PC에 저장된 OpenAI 키로 직접 호출합니다.",
+    };
+  }
+
+  return {
+    badge: "설정 필요",
+    tone: "pill-idle",
+    hint: "원격 승인 서버 또는 OpenAI 키 설정이 필요합니다.",
+    modal: "원격 승인 서버를 쓰거나, 필요하면 OpenAI 키를 직접 저장해야 합니다.",
+  };
+}
+
 function renderConnectionState(data) {
-  const remoteConfigured = Boolean(data?.remoteApiConfigured);
+  const remoteConfigured = Boolean(data?.remoteApiConfigured || data?.remoteApiUrlConfigured);
   const localConfigured = Boolean(data?.apiKeyConfigured);
   backendMode = data?.backendMode || (remoteConfigured ? "remote" : "openai");
 
@@ -264,6 +368,26 @@ function renderConnectionState(data) {
   remoteApiUrlInput.value = data?.remoteApiUrl || "";
   remoteApiTokenInput.value = "";
   renderRemoteAuthState(data);
+
+  if (backendMode === "openai" && localConfigured) {
+    setPill(apiKeyBadge, "Direct", "pill-ok");
+    apiKeyHint.textContent = data?.apiKeyMasked
+      ? `Using stored OpenAI key ${data.apiKeyMasked} for direct requests.`
+      : "Using a stored OpenAI key for direct requests.";
+  } else if (localConfigured) {
+    setPill(apiKeyBadge, "Fallback", "pill-ok");
+    apiKeyHint.textContent = data?.apiKeyMasked
+      ? `Fallback OpenAI key ${data.apiKeyMasked} is saved for remote failures.`
+      : "A fallback OpenAI key is saved for remote failures.";
+  } else {
+    setPill(apiKeyBadge, "None", "pill-idle");
+    apiKeyHint.textContent = "You can leave this empty when the remote approval flow is active.";
+  }
+
+  const summary = getConnectionSummary(data);
+  setPill(connectionBadge, summary.badge, summary.tone);
+  connectionHint.textContent = summary.hint;
+  authModalSummary.textContent = summary.modal;
 }
 
 function renderQuickModeState(payload) {
@@ -771,6 +895,17 @@ testApiKeyButton.addEventListener("click", testApiKey);
 clearApiKeyButton.addEventListener("click", clearApiKey);
 saveRemoteApiButton.addEventListener("click", saveRemoteApi);
 clearRemoteApiButton.addEventListener("click", clearRemoteApi);
+authModalOpenButton?.addEventListener("click", () => {
+  setAuthModalOpen(true);
+});
+authModalCloseButton?.addEventListener("click", () => {
+  setAuthModalOpen(false);
+});
+authModal?.addEventListener("click", (event) => {
+  if (event.target instanceof HTMLElement && event.target.dataset.closeAuthModal === "true") {
+    setAuthModalOpen(false);
+  }
+});
 requestAccessButton.addEventListener("click", () => {
   submitAccessRequest().catch((error) => {
     remoteAuthHint.textContent = error.message;
@@ -803,6 +938,11 @@ modelSelect.addEventListener("change", () => {
 });
 customModelInput.addEventListener("input", updateModelMeta);
 historySearchInput?.addEventListener("input", renderHistory);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && authModal && !authModal.hidden) {
+    setAuthModalOpen(false);
+  }
+});
 savedPromptInput.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     savePrompt();
