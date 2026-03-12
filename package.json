@@ -35,6 +35,7 @@
       "preload.js",
       "secure-store.js",
       "server.js",
+      "settings-store.js",
       "styles.css",
       "package.json"
     ],
