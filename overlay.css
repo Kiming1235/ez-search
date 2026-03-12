@@ -51,6 +51,114 @@ body {
   line-height: 1.55;
   font-size: 18px;
   word-break: keep-all;
+  white-space: normal;
+}
+
+.answer-line + .answer-line {
+  margin-top: 0.35em;
+}
+
+.answer-break {
+  height: 0.75em;
+}
+
+.answer-line-display-math {
+  margin: 0.55em 0;
+}
+
+.math-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-family: "Cambria Math", "Times New Roman", serif;
+}
+
+.math-block-display {
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.15em 0;
+  font-size: 1.08em;
+}
+
+.math-token,
+.math-paren {
+  display: inline-block;
+}
+
+.math-space {
+  display: inline-block;
+  width: 0.18em;
+}
+
+.math-base-with-script {
+  display: inline-flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+.math-sup,
+.math-sub {
+  font-size: 0.72em;
+  line-height: 1;
+}
+
+.math-sup {
+  margin-left: 0.04em;
+  transform: translateY(-0.42em);
+}
+
+.math-sub {
+  margin-left: 0.04em;
+  transform: translateY(0.32em);
+}
+
+.math-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 2.3em;
+  text-align: center;
+  margin: 0 0.12em;
+}
+
+.math-frac-num,
+.math-frac-den {
+  display: block;
+  padding: 0 0.18em;
+}
+
+.math-frac-num {
+  padding-bottom: 0.08em;
+}
+
+.math-frac-den {
+  padding-top: 0.08em;
+}
+
+.math-frac-bar {
+  display: block;
+  border-top: 1.6px solid rgba(245, 251, 255, 0.94);
+}
+
+.math-sqrt {
+  display: inline-flex;
+  align-items: flex-start;
+  margin-right: 0.06em;
+}
+
+.math-sqrt-sign {
+  font-size: 1.18em;
+  line-height: 1;
+  padding-right: 0.05em;
+  transform: translateY(0.06em);
+}
+
+.math-sqrt-body {
+  display: inline-block;
+  border-top: 1.6px solid rgba(245, 251, 255, 0.94);
+  padding: 0.08em 0.08em 0 0.12em;
 }
 
 .selection-box {

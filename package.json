@@ -23,6 +23,7 @@
     },
     "files": [
       "!**/.local/**",
+      "answer-format.js",
       "app.js",
       "assets/**/*",
       "electron-main.js",

@@ -11,54 +11,81 @@
     <section class="main-column">
       <section class="panel card">
         <div class="section-header">
-          <h2>OpenAI 연결</h2>
+          <h2>API 연결</h2>
           <span id="apiKeyBadge" class="pill pill-idle">미설정</span>
         </div>
         <label class="stack">
-          <span class="label">API 키</span>
+          <span class="label">OpenAI fallback 키</span>
           <input id="apiKeyInput" type="password" placeholder="sk-...">
         </label>
-        <p id="apiKeyHint" class="hint">키는 현재 Windows 사용자 기준으로 로컬에 암호화 저장됩니다.</p>
         <div class="action-row">
-          <button id="saveApiKeyButton" class="primary-button" type="button">키 저장</button>
-          <button id="testApiKeyButton" class="ghost-button" type="button">연결 테스트</button>
+          <button id="saveApiKeyButton" class="primary-button" type="button">저장</button>
+          <button id="testApiKeyButton" class="ghost-button" type="button">연결 확인</button>
           <button id="clearApiKeyButton" class="text-button" type="button">삭제</button>
         </div>
+        <label class="stack">
+          <span class="label">원격 API URL</span>
+          <input id="remoteApiUrlInput" type="url" placeholder="https://example.com/wp-json/screenexplain/v1/proxy">
+        </label>
+        <label class="stack">
+          <span class="label">레거시 공통 토큰 (선택)</span>
+          <input id="remoteApiTokenInput" type="password" placeholder="기존 공통 토큰이 있을 때만 입력">
+        </label>
+        <div class="action-row">
+          <button id="saveRemoteApiButton" class="primary-button" type="button">원격 저장</button>
+          <button id="clearRemoteApiButton" class="text-button" type="button">원격 해제</button>
+        </div>
+        <div class="status-row">
+          <span id="remoteAuthBadge" class="pill pill-idle">요청 없음</span>
+        </div>
+        <label class="stack">
+          <span class="label">이름</span>
+          <input id="requestNameInput" type="text" placeholder="승인 요청에 표시할 이름">
+        </label>
+        <label class="stack">
+          <span class="label">이메일</span>
+          <input id="requestEmailInput" type="email" placeholder="승인용 이메일">
+        </label>
+        <label class="stack">
+          <span class="label">요청 메모</span>
+          <textarea id="requestNoteInput" rows="3" placeholder="관리자에게 남길 메모"></textarea>
+        </label>
+        <div class="action-row">
+          <button id="requestAccessButton" class="ghost-button" type="button">승인 요청 보내기</button>
+          <button id="checkRequestStatusButton" class="ghost-button" type="button">상태 확인</button>
+          <button id="logoutRemoteAuthButton" class="text-button" type="button">로컬 초기화</button>
+        </div>
+        <p id="remoteAuthHint" class="hint">원격 URL을 저장한 뒤 이름과 이메일로 승인 요청을 보내면 됩니다.</p>
+        <p id="apiKeyHint" class="hint">원격 API를 우선 사용하고, 필요할 때만 OpenAI 키를 fallback으로 씁니다.</p>
       </section>
 
       <section class="panel card">
         <div class="section-header">
-          <h2>간편 답변 모드</h2>
-          <span id="quickModeBadge" class="pill pill-idle">꺼짐</span>
+          <h2>간편모드</h2>
+          <span id="quickModeBadge" class="pill pill-idle">비활성</span>
         </div>
-        <p class="hint">
-          앱의 기본 사용 방식입니다. 실행 후 트레이에 상주하며 <code>Ctrl+Shift+S</code>로 현재 모니터에서 드래그 선택 후
-          짧은 자막 답변을 받고, <code>Ctrl+Shift+M</code>나 트레이 아이콘 클릭으로 메인 창을 다시 엽니다.
-        </p>
+        <p class="hint"><code>Ctrl+Shift+S</code> 캡처<br><code>Ctrl+Shift+Q</code> 모드 진입/탈출</p>
         <div class="status-row">
-          <span id="serverStatus" class="pill pill-warn">서버 확인 전</span>
+          <span id="serverStatus" class="pill pill-warn">설정 필요</span>
         </div>
         <div class="action-row">
           <button id="enableQuickModeButton" class="primary-button" type="button">간편 모드 켜기</button>
-          <button id="startQuickCaptureButton" class="ghost-button" type="button">지금 바로 선택</button>
+          <button id="startQuickCaptureButton" class="ghost-button" type="button">즉시 캡처</button>
         </div>
-        <p id="captionOverlay" class="hint">
-          기존 상세 분석 모드는 제거되었습니다. 이 창은 간편 모드 설정과 기록 확인용입니다.
-        </p>
-        <p id="quickModeHint" class="hint">드래그한 영역을 기준으로 짧은 설명을 말풍선처럼 표시합니다.</p>
+        <p id="quickModeHint" class="hint"></p>
       </section>
 
       <section class="panel card">
         <div class="section-header">
-          <h2>저장 프롬프트</h2>
-          <span id="promptBadge" class="pill pill-idle">기본값 사용</span>
+          <h2>프롬프트</h2>
+          <span id="promptBadge" class="pill pill-idle">기본값</span>
         </div>
         <label class="stack">
-          <span class="label">캡처와 함께 사용할 분석 지시</span>
-          <textarea id="savedPromptInput" rows="6" placeholder="비워두면 화면 핵심 설명용 기본 프롬프트를 자동 사용합니다."></textarea>
+          <span class="label">캡처 분석에 추가할 지시문</span>
+          <textarea id="savedPromptInput" rows="6" placeholder="비워두면 내장 기본 프롬프트를 사용합니다."></textarea>
         </label>
         <div class="action-row">
-          <button id="savePromptButton" class="primary-button" type="button">저장</button>
+          <button id="savePromptButton" class="primary-button" type="button">프롬프트 저장</button>
           <span id="promptHint" class="busy-text"></span>
         </div>
       </section>
@@ -66,26 +93,26 @@
       <section class="panel card">
         <div class="section-header">
           <h2>모델</h2>
-          <span id="modelBadge" class="pill pill-idle">불러오는 중</span>
+          <span id="modelBadge" class="pill pill-idle">미설정</span>
         </div>
         <label class="stack">
-          <span class="label">추천 모델</span>
+          <span class="label">OpenAI API 모델</span>
           <select id="modelSelect"></select>
         </label>
         <label class="stack">
-          <span class="label">직접 입력할 모델 ID</span>
-          <input id="customModelInput" type="text" placeholder="예: gpt-4.1-mini">
+          <span class="label">직접 입력 모델 ID</span>
+          <input id="customModelInput" type="text" placeholder="예: gpt-5-mini">
         </label>
         <div class="action-row">
-          <button id="saveModelButton" class="primary-button" type="button">모델 적용</button>
+          <button id="saveModelButton" class="primary-button" type="button">모델 저장</button>
           <span id="modelMeta" class="busy-text"></span>
         </div>
       </section>
 
       <section class="panel card">
         <div class="section-header">
-          <h2>토큰 통계</h2>
-          <span id="usageModelName" class="pill pill-idle">미실행</span>
+          <h2>토큰 사용량</h2>
+          <span id="usageModelName" class="pill pill-idle">없음</span>
         </div>
         <div class="stats-grid">
           <div class="stat-box">
@@ -105,7 +132,7 @@
             <strong id="remainingTokensValue" class="stat-value">-</strong>
           </div>
         </div>
-        <p id="usageHint" class="hint">남은 컨텍스트는 모델 문서의 컨텍스트 윈도우 기준 추정치입니다.</p>
+        <p id="usageHint" class="hint">최근 응답의 토큰 사용량이 표시됩니다.</p>
       </section>
     </section>
 
@@ -113,8 +140,12 @@
       <section class="panel card history-card">
         <div class="history-header">
           <h2>최근 답변</h2>
-          <button id="clearHistoryButton" class="text-button" type="button">지우기</button>
+          <button id="clearHistoryButton" class="text-button" type="button">비우기</button>
         </div>
+        <label class="stack history-search">
+          <span class="label">최근 답변 검색</span>
+          <input id="historySearchInput" type="search" placeholder="프롬프트, 답변, 모델로 검색">
+        </label>
         <ol id="historyList" class="history-list"></ol>
       </section>
     </aside>
@@ -122,13 +153,17 @@
 
   <template id="historyItemTemplate">
     <li class="history-item">
+      <div class="history-item-header">
+        <time class="history-time"></time>
+        <button class="text-button history-pin" type="button">고정</button>
+      </div>
       <p class="history-question"></p>
       <p class="history-answer"></p>
       <p class="history-meta"></p>
-      <time class="history-time"></time>
     </li>
   </template>
 
+  <script src="./answer-format.js"></script>
   <script src="./app.js" type="module"></script>
 </body>
 </html>

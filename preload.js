@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("screenExplainDesktop", {
   enableQuickMode: () => ipcRenderer.invoke("screen-explain:enable-quick-mode"),
   disableQuickMode: () => ipcRenderer.invoke("screen-explain:disable-quick-mode"),
   startQuickCapture: () => ipcRenderer.invoke("screen-explain:start-quick-capture"),
+  openExternal: (targetUrl) => ipcRenderer.invoke("screen-explain:open-external", targetUrl),
   onQuickModeChanged: (listener) => {
     const wrapped = (_event, payload) => listener(payload);
     ipcRenderer.on("screen-explain:quick-mode-changed", wrapped);

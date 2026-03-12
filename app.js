@@ -6,15 +6,26 @@ const clearApiKeyButton = document.getElementById("clearApiKeyButton");
 const savePromptButton = document.getElementById("savePromptButton");
 const enableQuickModeButton = document.getElementById("enableQuickModeButton");
 const startQuickCaptureButton = document.getElementById("startQuickCaptureButton");
-const captionOverlay = document.getElementById("captionOverlay");
+const apiKeyInput = document.getElementById("apiKeyInput");
+const remoteApiUrlInput = document.getElementById("remoteApiUrlInput");
+const remoteApiTokenInput = document.getElementById("remoteApiTokenInput");
+const saveRemoteApiButton = document.getElementById("saveRemoteApiButton");
+const clearRemoteApiButton = document.getElementById("clearRemoteApiButton");
+const requestNameInput = document.getElementById("requestNameInput");
+const requestEmailInput = document.getElementById("requestEmailInput");
+const requestNoteInput = document.getElementById("requestNoteInput");
+const requestAccessButton = document.getElementById("requestAccessButton");
+const checkRequestStatusButton = document.getElementById("checkRequestStatusButton");
+const logoutRemoteAuthButton = document.getElementById("logoutRemoteAuthButton");
 const modelSelect = document.getElementById("modelSelect");
 const customModelInput = document.getElementById("customModelInput");
 const savedPromptInput = document.getElementById("savedPromptInput");
 const promptBadge = document.getElementById("promptBadge");
 const promptHint = document.getElementById("promptHint");
-const apiKeyInput = document.getElementById("apiKeyInput");
 const apiKeyBadge = document.getElementById("apiKeyBadge");
 const apiKeyHint = document.getElementById("apiKeyHint");
+const remoteAuthBadge = document.getElementById("remoteAuthBadge");
+const remoteAuthHint = document.getElementById("remoteAuthHint");
 const modelBadge = document.getElementById("modelBadge");
 const quickModeBadge = document.getElementById("quickModeBadge");
 const quickModeHint = document.getElementById("quickModeHint");
@@ -25,89 +36,283 @@ const outputTokensValue = document.getElementById("outputTokensValue");
 const totalTokensValue = document.getElementById("totalTokensValue");
 const remainingTokensValue = document.getElementById("remainingTokensValue");
 const usageHint = document.getElementById("usageHint");
+const historySearchInput = document.getElementById("historySearchInput");
 const historyList = document.getElementById("historyList");
 const historyItemTemplate = document.getElementById("historyItemTemplate");
 const serverStatus = document.getElementById("serverStatus");
+const answerFormatter = window.ScreenExplainAnswerFormat;
 
 let currentModel = "";
 let supportedModels = [];
 let quickModeEnabled = false;
 let savedPrompt = "";
+let backendMode = "openai";
+let remoteTokenKind = "";
+let remoteAuthUser = null;
+let remoteAuthExpiresAt = "";
+let remoteApprovalRequest = null;
 
 const history = [];
 const desktopBridge = window.screenExplainDesktop || null;
-const DEFAULT_PROMPT =
-  "이 화면에서 사용자가 지금 바로 알아야 할 핵심 내용을 짧고 정확하게 설명해줘. 문제 풀이처럼 보이면 정답과 핵심 근거를 먼저 말해줘.";
 
-function setPill(el, text, tone) {
-  el.textContent = text;
-  el.className = `pill ${tone}`;
+function setPill(element, text, tone) {
+  element.textContent = text;
+  element.className = `pill ${tone}`;
 }
 
 function formatNumber(value) {
   return typeof value === "number" ? value.toLocaleString("ko-KR") : "-";
 }
 
-function getEffectivePrompt() {
-  return savedPrompt && savedPrompt.trim() ? savedPrompt.trim() : DEFAULT_PROMPT;
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString("ko-KR");
+}
+
+function createHistoryId() {
+  return `history-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function getCustomPrompt() {
+  return savedPrompt && savedPrompt.trim() ? savedPrompt.trim() : "";
+}
+
+function getHistorySearchTerm() {
+  return historySearchInput?.value.trim().toLowerCase() || "";
+}
+
+function sanitizeHistoryForSave() {
+  return history.slice(0, 30).map((item) => ({
+    id: item.id,
+    answer: item.answer,
+    metaText: item.metaText,
+    promptText: item.promptText,
+    pinned: item.pinned === true,
+    createdAt: item.createdAt instanceof Date ? item.createdAt.toISOString() : new Date().toISOString(),
+  }));
+}
+
+async function postJson(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}
+
+async function persistHistory() {
+  return postJson("/api/settings", { recentHistory: sanitizeHistoryForSave() });
 }
 
 function renderPromptState() {
-  const customPrompt = savedPrompt && savedPrompt.trim();
-  setPill(promptBadge, customPrompt ? "사용자 저장" : "기본값 사용", customPrompt ? "pill-ok" : "pill-idle");
+  const customPrompt = getCustomPrompt();
+  setPill(promptBadge, customPrompt ? "사용자 프롬프트" : "기본값", customPrompt ? "pill-ok" : "pill-idle");
   promptHint.textContent = customPrompt
-    ? "저장한 프롬프트가 간편 모드 분석에 공통 적용됩니다."
-    : "프롬프트가 비어 있어 기본 설명 프롬프트를 사용합니다.";
+    ? "지금 저장된 사용자 프롬프트가 캡처 분석에 사용됩니다."
+    : "입력칸이 비어 있으면 내장 기본 프롬프트를 사용합니다.";
 }
 
 function renderUsage(usage = null, model = currentModel) {
-  usageModelName.textContent = model || "미실행";
+  usageModelName.textContent = model || "미설정";
   usageModelName.className = `pill ${usage ? "pill-ok" : "pill-idle"}`;
   inputTokensValue.textContent = formatNumber(usage?.inputTokens);
   outputTokensValue.textContent = formatNumber(usage?.outputTokens);
   totalTokensValue.textContent = formatNumber(usage?.totalTokens);
   remainingTokensValue.textContent = formatNumber(usage?.remainingContextTokens);
   usageHint.textContent = usage?.remainingContextTokens == null
-    ? "현재 모델의 컨텍스트 윈도우 정보를 알 수 없어 남은 토큰 추정을 표시하지 못합니다."
-    : "남은 컨텍스트는 현재 호출 기준 추정치입니다.";
+    ? "최근 응답의 사용량이 아직 없습니다."
+    : "최근 응답 기준 토큰 사용량입니다.";
 }
 
-function renderApiKeyState(data) {
-  const configured = Boolean(data?.apiKeyConfigured);
-  setPill(apiKeyBadge, configured ? "연결됨" : "미설정", configured ? "pill-ok" : "pill-idle");
-  apiKeyHint.textContent = configured
-    ? `저장된 키: ${data.apiKeyMasked}`
-    : "키는 현재 Windows 사용자 기준으로 로컬에 암호화 저장됩니다.";
-  if (configured) {
-    apiKeyInput.value = "";
+function normalizeApprovalRequest(data) {
+  if (!data || typeof data !== "object") {
+    return null;
   }
+
+  const requestId = typeof data.requestId === "string" ? data.requestId.trim() : "";
+  const email = typeof data.email === "string" ? data.email.trim() : "";
+  if (!requestId || !email) {
+    return null;
+  }
+
+  return {
+    requestId,
+    email,
+    name: typeof data.name === "string" ? data.name.trim() : "",
+    note: typeof data.note === "string" ? data.note.trim() : "",
+    deviceLabel: typeof data.deviceLabel === "string" ? data.deviceLabel.trim() : "",
+    status: typeof data.status === "string" ? data.status.trim() : "pending",
+    requestedAt: typeof data.requestedAt === "string" ? data.requestedAt.trim() : "",
+    updatedAt: typeof data.updatedAt === "string" ? data.updatedAt.trim() : "",
+  };
+}
+
+function syncApprovalForm() {
+  if (!remoteApprovalRequest) {
+    return;
+  }
+
+  requestNameInput.value = remoteApprovalRequest.name || "";
+  requestEmailInput.value = remoteApprovalRequest.email || "";
+  requestNoteInput.value = remoteApprovalRequest.note || "";
+}
+
+function renderRemoteAuthState(data) {
+  remoteTokenKind = data?.remoteTokenKind || "";
+  remoteAuthUser = data?.remoteAuthUser || null;
+  remoteAuthExpiresAt = data?.remoteAuthExpiresAt || "";
+  remoteApprovalRequest = normalizeApprovalRequest(data?.remoteApprovalRequest);
+
+  const remoteUrlConfigured = Boolean(data?.remoteApiUrlConfigured || data?.remoteApiUrl);
+  const hasApprovalRequest = Boolean(remoteApprovalRequest?.requestId);
+
+  syncApprovalForm();
+
+  requestAccessButton.disabled = !remoteUrlConfigured;
+  checkRequestStatusButton.disabled = !remoteUrlConfigured || !hasApprovalRequest;
+  logoutRemoteAuthButton.disabled = !remoteTokenKind && !hasApprovalRequest;
+
+  if (!remoteUrlConfigured) {
+    setPill(remoteAuthBadge, "URL 필요", "pill-idle");
+    remoteAuthHint.textContent = "원격 API URL을 먼저 저장해야 승인 요청을 보낼 수 있습니다.";
+    return;
+  }
+
+  if (remoteTokenKind === "user-session" && remoteAuthUser?.email) {
+    setPill(remoteAuthBadge, "승인됨", "pill-ok");
+    const bits = [];
+    if (remoteAuthUser.name) {
+      bits.push(remoteAuthUser.name);
+    }
+    bits.push(remoteAuthUser.email);
+    if (remoteAuthExpiresAt) {
+      bits.push(`만료 ${formatDateTime(remoteAuthExpiresAt)}`);
+    }
+    remoteAuthHint.textContent = bits.join(" / ");
+    return;
+  }
+
+  if (remoteTokenKind === "legacy") {
+    setPill(remoteAuthBadge, "레거시 토큰", "pill-warn");
+    remoteAuthHint.textContent = "공통 토큰 방식입니다. 새 배포는 승인 요청 방식 사용을 권장합니다.";
+    return;
+  }
+
+  if (hasApprovalRequest) {
+    if (remoteApprovalRequest.status === "approved") {
+      setPill(remoteAuthBadge, "승인 완료", "pill-ok");
+      remoteAuthHint.textContent = "승인된 기기입니다. 상태 확인을 누르면 세션을 다시 발급받습니다.";
+      return;
+    }
+
+    if (remoteApprovalRequest.status === "blocked") {
+      setPill(remoteAuthBadge, "차단됨", "pill-error");
+      remoteAuthHint.textContent = "이 요청은 현재 차단 상태입니다. 관리자에게 확인하십시오.";
+      return;
+    }
+
+    setPill(remoteAuthBadge, "승인 대기", "pill-warn");
+    remoteAuthHint.textContent = "승인 요청이 접수되었습니다. 관리자가 승인하면 상태 확인 후 바로 사용할 수 있습니다.";
+    return;
+  }
+
+  setPill(remoteAuthBadge, "요청 없음", "pill-idle");
+  remoteAuthHint.textContent = "이 앱에서 이름과 이메일을 입력해 승인 요청을 보내면 됩니다.";
+}
+
+function renderConnectionState(data) {
+  const remoteConfigured = Boolean(data?.remoteApiConfigured);
+  const localConfigured = Boolean(data?.apiKeyConfigured);
+  backendMode = data?.backendMode || (remoteConfigured ? "remote" : "openai");
+
+  if (backendMode === "remote") {
+    setPill(apiKeyBadge, "원격 API", "pill-ok");
+  } else if (localConfigured) {
+    setPill(apiKeyBadge, "OpenAI 직접", "pill-ok");
+  } else {
+    setPill(apiKeyBadge, "미설정", "pill-idle");
+  }
+
+  const bits = [];
+  if (data?.remoteApiUrl) {
+    bits.push(`원격 URL: ${data.remoteApiUrl}`);
+  }
+  if (data?.remoteApiTokenMasked) {
+    bits.push(`원격 토큰: ${data.remoteApiTokenMasked}`);
+  }
+  if (localConfigured) {
+    bits.push(`OpenAI 키: ${data.apiKeyMasked}`);
+  } else {
+    bits.push("OpenAI 키 없음");
+  }
+
+  apiKeyHint.textContent = bits.join(" / ");
+  apiKeyInput.value = "";
+  remoteApiUrlInput.value = data?.remoteApiUrl || "";
+  remoteApiTokenInput.value = "";
+  renderRemoteAuthState(data);
 }
 
 function renderQuickModeState(payload) {
   quickModeEnabled = Boolean(payload?.quickModeEnabled);
-  setPill(quickModeBadge, quickModeEnabled ? "켜짐" : "꺼짐", quickModeEnabled ? "pill-ok" : "pill-idle");
+  setPill(quickModeBadge, quickModeEnabled ? "활성" : "비활성", quickModeEnabled ? "pill-ok" : "pill-idle");
   enableQuickModeButton.textContent = quickModeEnabled ? "간편 모드 끄기" : "간편 모드 켜기";
-  quickModeHint.textContent = quickModeEnabled
-    ? `간편 모드 활성화됨. ${payload.showMainShortcut}로 메인 창 복귀, ${payload.captureShortcut}로 즉시 드래그 분석`
-    : "드래그한 영역을 기준으로 짧은 설명을 말풍선처럼 표시합니다.";
+  quickModeHint.textContent = "";
+}
+
+function renderServerState(data) {
+  if (data?.backendMode === "remote") {
+    setPill(serverStatus, "원격 API", "pill-ok");
+    return;
+  }
+
+  if (data?.remoteApiUrlConfigured) {
+    setPill(serverStatus, "승인 필요", "pill-warn");
+    return;
+  }
+
+  if (data?.apiKeyConfigured) {
+    setPill(serverStatus, "OpenAI 직접", "pill-ok");
+    return;
+  }
+
+  setPill(serverStatus, "설정 필요", "pill-warn");
 }
 
 function populateModelSelect(models, activeModel) {
-  supportedModels = models;
+  supportedModels = Array.isArray(models) ? models : [];
   modelSelect.innerHTML = "";
 
-  const modelNames = new Set(models.map((model) => model.id));
-  if (activeModel && !modelNames.has(activeModel)) {
+  const knownIds = new Set(supportedModels.map((model) => model.id));
+  if (activeModel && !knownIds.has(activeModel)) {
     const option = document.createElement("option");
     option.value = activeModel;
-    option.textContent = `${activeModel} (현재 사용자 지정)`;
+    option.textContent = `${activeModel} (사용 중)`;
     modelSelect.appendChild(option);
   }
 
-  for (const model of models) {
+  for (const model of supportedModels) {
     const option = document.createElement("option");
     option.value = model.id;
-    option.textContent = `${model.label} · ${model.contextWindow.toLocaleString("ko-KR")} ctx`;
+    const contextText = typeof model.contextWindow === "number"
+      ? ` / ctx ${model.contextWindow.toLocaleString("ko-KR")}`
+      : model.ownedBy
+        ? ` / ${model.ownedBy}`
+        : "";
+    option.textContent = `${model.label || model.id}${contextText}`;
     modelSelect.appendChild(option);
   }
 
@@ -122,35 +327,127 @@ function updateModelMeta() {
   const chosenModel = supportedModels.find((model) => model.id === chosenId);
 
   if (!chosenModel) {
-    modelMeta.textContent = "사용자 지정 모델 ID를 적용합니다.";
+    modelMeta.textContent = "직접 입력한 모델 ID를 사용합니다.";
     return;
   }
 
-  modelMeta.textContent =
-    `컨텍스트 ${chosenModel.contextWindow.toLocaleString("ko-KR")} · 최대 출력 ${chosenModel.maxOutputTokens.toLocaleString("ko-KR")}`;
+  const parts = [];
+  if (typeof chosenModel.contextWindow === "number") {
+    parts.push(`컨텍스트 ${chosenModel.contextWindow.toLocaleString("ko-KR")}`);
+  }
+  if (typeof chosenModel.maxOutputTokens === "number") {
+    parts.push(`최대 출력 ${chosenModel.maxOutputTokens.toLocaleString("ko-KR")}`);
+  }
+  if (chosenModel.ownedBy) {
+    parts.push(`소유자 ${chosenModel.ownedBy}`);
+  }
+
+  modelMeta.textContent = parts.length
+    ? parts.join(" / ")
+    : "OpenAI API가 제공한 모델 정보가 제한적입니다.";
 }
 
-function addHistory(answer, metaText, promptText = getEffectivePrompt()) {
+function loadHistory(items = []) {
+  history.length = 0;
+
+  for (const item of items) {
+    history.push({
+      id: item.id || createHistoryId(),
+      answer: item.answer || "",
+      metaText: item.metaText || "",
+      promptText: item.promptText || "",
+      pinned: item.pinned === true,
+      createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),
+    });
+  }
+
+  renderHistory();
+}
+
+function buildHistoryPromptLabel(item) {
+  return item.promptText ? `사용자 프롬프트: ${item.promptText}` : "프롬프트: 기본값";
+}
+
+function addHistory(answer, metaText, promptText = getCustomPrompt()) {
   history.unshift({
+    id: createHistoryId(),
     answer,
     metaText,
     promptText,
+    pinned: false,
     createdAt: new Date(),
   });
 
-  history.splice(8);
+  history.splice(30);
   renderHistory();
+  persistHistory().catch((error) => {
+    quickModeHint.textContent = error.message;
+  });
+}
+
+function togglePinHistoryItem(historyId) {
+  const item = history.find((entry) => entry.id === historyId);
+  if (!item) {
+    return;
+  }
+
+  item.pinned = !item.pinned;
+  renderHistory();
+  persistHistory().catch((error) => {
+    quickModeHint.textContent = error.message;
+  });
 }
 
 function renderHistory() {
   historyList.innerHTML = "";
 
-  for (const item of history) {
+  const searchTerm = getHistorySearchTerm();
+  const items = [...history]
+    .sort((left, right) => {
+      if (left.pinned !== right.pinned) {
+        return left.pinned ? -1 : 1;
+      }
+      return right.createdAt - left.createdAt;
+    })
+    .filter((item) => {
+      if (!searchTerm) {
+        return true;
+      }
+
+      const haystack = [buildHistoryPromptLabel(item), item.answer, item.metaText].join(" ").toLowerCase();
+      return haystack.includes(searchTerm);
+    });
+
+  if (!items.length) {
+    const emptyState = document.createElement("li");
+    emptyState.className = "history-empty";
+    emptyState.textContent = searchTerm ? "검색 결과가 없습니다." : "최근 답변이 없습니다.";
+    historyList.appendChild(emptyState);
+    return;
+  }
+
+  for (const item of items) {
     const node = historyItemTemplate.content.firstElementChild.cloneNode(true);
-    node.querySelector(".history-question").textContent = `Prompt. ${item.promptText}`;
-    node.querySelector(".history-answer").textContent = item.answer;
+    const historyPrompt = node.querySelector(".history-question");
+    historyPrompt.textContent = buildHistoryPromptLabel(item);
+    historyPrompt.hidden = false;
+
+    const historyAnswer = node.querySelector(".history-answer");
+    if (answerFormatter) {
+      historyAnswer.innerHTML = answerFormatter.renderAnswerHtml(item.answer);
+    } else {
+      historyAnswer.textContent = item.answer;
+    }
+
     node.querySelector(".history-meta").textContent = item.metaText || "";
     node.querySelector(".history-time").textContent = item.createdAt.toLocaleTimeString("ko-KR");
+
+    const pinButton = node.querySelector(".history-pin");
+    pinButton.textContent = item.pinned ? "고정 해제" : "고정";
+    pinButton.addEventListener("click", () => {
+      togglePinHistoryItem(item.id);
+    });
+
     historyList.appendChild(node);
   }
 }
@@ -163,23 +460,36 @@ async function loadSettings() {
 
   const data = await response.json();
   populateModelSelect(data.supportedModels || [], data.model || "");
-  savedPrompt = data.savedPrompt || "";
+  savedPrompt = data.customPrompt || "";
   savedPromptInput.value = savedPrompt;
+  loadHistory(data.recentHistory || []);
   renderPromptState();
-  renderApiKeyState(data);
+  renderConnectionState(data);
   setPill(modelBadge, data.model || "미설정", "pill-ok");
-  setPill(
-    serverStatus,
-    data.apiKeyConfigured ? "서버 준비 완료" : "OpenAI API 키 필요",
-    data.apiKeyConfigured ? "pill-ok" : "pill-warn",
-  );
+  renderServerState(data);
+  return data;
+}
+
+async function maybeRefreshApprovalStatus(data) {
+  if (!data?.remoteApprovalRequest || data?.remoteTokenKind || !data?.remoteApiUrlConfigured) {
+    return;
+  }
+
+  try {
+    const next = await postJson("/api/auth/check-status", {});
+    renderConnectionState(next);
+    renderServerState(next);
+  } catch {
+    // Silent on initial load. The user can retry manually.
+  }
 }
 
 async function checkServer() {
   try {
-    await loadSettings();
+    const data = await loadSettings();
+    await maybeRefreshApprovalStatus(data);
   } catch {
-    setPill(serverStatus, "서버 연결 실패", "pill-error");
+    setPill(serverStatus, "서버 오류", "pill-error");
   }
 }
 
@@ -199,28 +509,21 @@ async function saveModel() {
   }
 
   saveModelButton.disabled = true;
-  modelMeta.textContent = "모델을 적용하는 중입니다...";
+  modelMeta.textContent = "모델 저장 중...";
 
   try {
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: nextModel }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-
+    const data = await postJson("/api/settings", { model: nextModel });
     currentModel = data.model;
     customModelInput.value = data.model;
     if ([...modelSelect.options].some((option) => option.value === data.model)) {
       modelSelect.value = data.model;
     }
-    savedPrompt = data.savedPrompt || savedPrompt;
+    savedPrompt = data.customPrompt || "";
+    savedPromptInput.value = savedPrompt;
     renderPromptState();
-    renderApiKeyState(data);
+    renderConnectionState(data);
     setPill(modelBadge, data.model, "pill-ok");
+    renderServerState(data);
     updateModelMeta();
   } catch (error) {
     modelMeta.textContent = error.message;
@@ -232,24 +535,18 @@ async function saveModel() {
 async function savePrompt() {
   const nextPrompt = savedPromptInput.value.trim();
   savePromptButton.disabled = true;
-  promptHint.textContent = "분석 프롬프트를 저장하는 중입니다...";
+  promptHint.textContent = "프롬프트 저장 중...";
 
   try {
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ savedPrompt: nextPrompt || DEFAULT_PROMPT }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-
-    savedPrompt = nextPrompt || DEFAULT_PROMPT;
-    savedPromptInput.value = nextPrompt;
+    const data = await postJson("/api/settings", { savedPrompt: nextPrompt });
+    savedPrompt = data.customPrompt || "";
+    savedPromptInput.value = savedPrompt;
     renderPromptState();
-    promptHint.textContent = "저장되었습니다. 이후 간편 모드 캡처는 이 프롬프트를 사용합니다.";
-    renderApiKeyState(data);
+    promptHint.textContent = savedPrompt
+      ? "사용자 프롬프트를 저장했습니다."
+      : "입력값을 비워 기본 프롬프트로 되돌렸습니다.";
+    renderConnectionState(data);
+    renderServerState(data);
   } catch (error) {
     promptHint.textContent = error.message;
   } finally {
@@ -260,30 +557,17 @@ async function savePrompt() {
 async function saveApiKey() {
   const nextApiKey = apiKeyInput.value.trim();
   if (!nextApiKey) {
-    apiKeyHint.textContent = "저장할 OpenAI API 키를 입력해 주세요.";
+    apiKeyHint.textContent = "OpenAI API 키를 입력하십시오.";
     return;
   }
 
   saveApiKeyButton.disabled = true;
-  apiKeyHint.textContent = "API 키를 저장하는 중입니다...";
+  apiKeyHint.textContent = "API 키 저장 중...";
 
   try {
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: nextApiKey }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-
-    renderApiKeyState(data);
-    setPill(
-      serverStatus,
-      data.apiKeyConfigured ? "서버 준비 완료" : "OpenAI API 키 필요",
-      data.apiKeyConfigured ? "pill-ok" : "pill-warn",
-    );
+    const data = await postJson("/api/settings", { apiKey: nextApiKey });
+    renderConnectionState(data);
+    renderServerState(data);
   } catch (error) {
     apiKeyHint.textContent = error.message;
   } finally {
@@ -293,15 +577,28 @@ async function saveApiKey() {
 
 async function testApiKey() {
   testApiKeyButton.disabled = true;
-  apiKeyHint.textContent = "OpenAI 연결을 확인하는 중입니다...";
+  apiKeyHint.textContent = "연결 확인 중...";
 
   try {
     const response = await fetch("/api/test-auth", { method: "POST" });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
-    apiKeyHint.textContent = "OpenAI 연결이 정상입니다.";
+
+    if (String(data.backendMode || "").startsWith("remote")) {
+      const settings = await loadSettings();
+      renderConnectionState(settings);
+      renderServerState(settings);
+    }
+
+    apiKeyHint.textContent = data.backendMode === "remote"
+      ? "원격 API 연결이 정상입니다."
+      : data.backendMode === "remote-pending"
+        ? "원격 URL은 정상입니다. 현재 기기는 승인 대기 또는 세션 발급 전 상태입니다."
+        : data.backendMode === "remote-ready"
+          ? "원격 URL은 정상입니다. 승인 요청 또는 토큰 입력이 필요합니다."
+          : "OpenAI API 연결이 정상입니다.";
   } catch (error) {
     apiKeyHint.textContent = error.message;
   } finally {
@@ -312,21 +609,128 @@ async function testApiKey() {
 async function clearApiKey() {
   clearApiKeyButton.disabled = true;
   try {
-    const response = await fetch("/api/settings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clearApiKey: true }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP ${response.status}`);
-    }
-    renderApiKeyState(data);
-    setPill(serverStatus, "OpenAI API 키 필요", "pill-warn");
+    const data = await postJson("/api/settings", { clearApiKey: true });
+    renderConnectionState(data);
+    renderServerState(data);
   } catch (error) {
     apiKeyHint.textContent = error.message;
   } finally {
     clearApiKeyButton.disabled = false;
+  }
+}
+
+async function saveRemoteApi() {
+  const remoteApiUrl = remoteApiUrlInput.value.trim();
+  const remoteApiToken = remoteApiTokenInput.value.trim();
+
+  if (!remoteApiUrl) {
+    apiKeyHint.textContent = "원격 API URL을 입력하십시오.";
+    return;
+  }
+
+  saveRemoteApiButton.disabled = true;
+  apiKeyHint.textContent = "원격 API 저장 중...";
+
+  try {
+    const body = { remoteApiUrl };
+    if (remoteApiToken) {
+      body.remoteApiToken = remoteApiToken;
+    }
+
+    const data = await postJson("/api/settings", body);
+    renderConnectionState(data);
+    renderServerState(data);
+    apiKeyHint.textContent = remoteApiToken
+      ? "원격 URL과 레거시 토큰을 저장했습니다."
+      : "원격 URL을 저장했습니다. 이제 승인 요청을 보낼 수 있습니다.";
+  } catch (error) {
+    apiKeyHint.textContent = error.message;
+  } finally {
+    saveRemoteApiButton.disabled = false;
+  }
+}
+
+async function clearRemoteApi() {
+  clearRemoteApiButton.disabled = true;
+
+  try {
+    const data = await postJson("/api/settings", {
+      remoteApiUrl: "",
+      clearRemoteApiToken: true,
+    });
+
+    renderConnectionState(data);
+    renderServerState(data);
+    apiKeyHint.textContent = "원격 API 설정을 지웠습니다.";
+  } catch (error) {
+    apiKeyHint.textContent = error.message;
+  } finally {
+    clearRemoteApiButton.disabled = false;
+  }
+}
+
+async function submitAccessRequest() {
+  const name = requestNameInput.value.trim();
+  const email = requestEmailInput.value.trim();
+  const note = requestNoteInput.value.trim();
+
+  if (!email) {
+    remoteAuthHint.textContent = "이메일은 필수입니다.";
+    return;
+  }
+
+  requestAccessButton.disabled = true;
+  remoteAuthHint.textContent = "승인 요청 전송 중...";
+
+  try {
+    const data = await postJson("/api/auth/request-access", { name, email, note });
+    renderConnectionState(data);
+    renderServerState(data);
+    remoteAuthHint.textContent = data.requestStatus === "approved"
+      ? "이미 승인된 기기입니다. 상태 확인 후 바로 사용할 수 있습니다."
+      : "승인 요청을 보냈습니다. 관리자가 승인하면 상태 확인 후 바로 사용 가능합니다.";
+  } catch (error) {
+    remoteAuthHint.textContent = error.message;
+  } finally {
+    requestAccessButton.disabled = false;
+  }
+}
+
+async function checkApprovalStatus() {
+  checkRequestStatusButton.disabled = true;
+  remoteAuthHint.textContent = "승인 상태 확인 중...";
+
+  try {
+    const data = await postJson("/api/auth/check-status", {});
+    renderConnectionState(data);
+    renderServerState(data);
+
+    if (data.remoteTokenKind === "user-session") {
+      remoteAuthHint.textContent = "승인이 확인되어 바로 사용할 수 있습니다.";
+    } else if (data.requestStatus === "blocked") {
+      remoteAuthHint.textContent = "이 요청은 현재 차단 상태입니다.";
+    } else {
+      remoteAuthHint.textContent = "아직 승인 대기 중입니다.";
+    }
+  } catch (error) {
+    remoteAuthHint.textContent = error.message;
+  } finally {
+    checkRequestStatusButton.disabled = false;
+  }
+}
+
+async function logoutRemoteAuth() {
+  logoutRemoteAuthButton.disabled = true;
+
+  try {
+    const data = await postJson("/api/auth/logout", {});
+    renderConnectionState(data);
+    renderServerState(data);
+    remoteAuthHint.textContent = "로컬 승인 정보와 세션을 정리했습니다.";
+  } catch (error) {
+    remoteAuthHint.textContent = error.message;
+  } finally {
+    logoutRemoteAuthButton.disabled = false;
   }
 }
 
@@ -356,11 +760,32 @@ async function triggerQuickCapture() {
 clearHistoryButton.addEventListener("click", () => {
   history.length = 0;
   renderHistory();
+  persistHistory().catch((error) => {
+    quickModeHint.textContent = error.message;
+  });
 });
+
 saveModelButton.addEventListener("click", saveModel);
 saveApiKeyButton.addEventListener("click", saveApiKey);
 testApiKeyButton.addEventListener("click", testApiKey);
 clearApiKeyButton.addEventListener("click", clearApiKey);
+saveRemoteApiButton.addEventListener("click", saveRemoteApi);
+clearRemoteApiButton.addEventListener("click", clearRemoteApi);
+requestAccessButton.addEventListener("click", () => {
+  submitAccessRequest().catch((error) => {
+    remoteAuthHint.textContent = error.message;
+  });
+});
+checkRequestStatusButton.addEventListener("click", () => {
+  checkApprovalStatus().catch((error) => {
+    remoteAuthHint.textContent = error.message;
+  });
+});
+logoutRemoteAuthButton.addEventListener("click", () => {
+  logoutRemoteAuth().catch((error) => {
+    remoteAuthHint.textContent = error.message;
+  });
+});
 savePromptButton.addEventListener("click", savePrompt);
 enableQuickModeButton.addEventListener("click", () => {
   toggleQuickMode().catch((error) => {
@@ -377,6 +802,7 @@ modelSelect.addEventListener("change", () => {
   updateModelMeta();
 });
 customModelInput.addEventListener("input", updateModelMeta);
+historySearchInput?.addEventListener("input", renderHistory);
 savedPromptInput.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
     savePrompt();
@@ -395,12 +821,16 @@ if (desktopBridge?.onQuickModeChanged) {
 if (desktopBridge?.onQuickAnswer) {
   desktopBridge.onQuickAnswer((payload) => {
     const metaText = payload?.usage
-      ? `quick · ${payload.model} · 입력 ${formatNumber(payload.usage.inputTokens)} · 출력 ${formatNumber(payload.usage.outputTokens)}`
-      : `quick · ${payload?.model || currentModel}`;
-    addHistory(payload?.answer || "", metaText, payload?.promptText || getEffectivePrompt());
+      ? `간편모드 / ${payload.model} / 입력 ${formatNumber(payload.usage.inputTokens)} / 출력 ${formatNumber(payload.usage.outputTokens)}`
+      : `간편모드 / ${payload?.model || currentModel}`;
+    addHistory(
+      payload?.answer || "",
+      metaText,
+      payload?.promptText || getCustomPrompt(),
+    );
     if (payload?.usage) {
       renderUsage(payload.usage, payload.model || currentModel);
     }
-    captionOverlay.textContent = payload?.answer || "간편 모드 답변이 기록되었습니다.";
+    quickModeHint.textContent = "";
   });
 }

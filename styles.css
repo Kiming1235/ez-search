@@ -197,6 +197,10 @@ button:disabled {
   min-height: calc(100vh - 40px);
 }
 
+.history-search {
+  margin-bottom: 12px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -243,6 +247,14 @@ button:disabled {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.history-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .history-question {
   color: #bfe9ff;
   margin-bottom: 8px;
@@ -250,12 +262,131 @@ button:disabled {
 
 .history-answer {
   line-height: 1.55;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+.history-answer .answer-line + .answer-line {
+  margin-top: 0.35em;
+}
+
+.history-answer .answer-break {
+  height: 0.75em;
+}
+
+.history-answer .answer-line-display-math {
+  margin: 0.55em 0;
+}
+
+.math-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-family: "Cambria Math", "Times New Roman", serif;
+}
+
+.math-block-display {
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.15em 0;
+  font-size: 1.08em;
+}
+
+.math-token,
+.math-paren {
+  display: inline-block;
+}
+
+.math-space {
+  display: inline-block;
+  width: 0.18em;
+}
+
+.math-base-with-script {
+  display: inline-flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+.math-sup,
+.math-sub {
+  font-size: 0.72em;
+  line-height: 1;
+}
+
+.math-sup {
+  margin-left: 0.04em;
+  transform: translateY(-0.42em);
+}
+
+.math-sub {
+  margin-left: 0.04em;
+  transform: translateY(0.32em);
+}
+
+.math-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 2.3em;
+  text-align: center;
+  margin: 0 0.12em;
+}
+
+.math-frac-num,
+.math-frac-den {
+  display: block;
+  padding: 0 0.18em;
+}
+
+.math-frac-num {
+  padding-bottom: 0.08em;
+}
+
+.math-frac-den {
+  padding-top: 0.08em;
+}
+
+.math-frac-bar {
+  display: block;
+  border-top: 1.6px solid rgba(244, 248, 255, 0.92);
+}
+
+.math-sqrt {
+  display: inline-flex;
+  align-items: flex-start;
+  margin-right: 0.06em;
+}
+
+.math-sqrt-sign {
+  font-size: 1.18em;
+  line-height: 1;
+  padding-right: 0.05em;
+  transform: translateY(0.06em);
+}
+
+.math-sqrt-body {
+  display: inline-block;
+  border-top: 1.6px solid rgba(244, 248, 255, 0.92);
+  padding: 0.08em 0.08em 0 0.12em;
 }
 
 .history-meta {
   margin-top: 10px;
   font-size: 13px;
+}
+
+.history-empty {
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.history-pin {
+  min-width: 70px;
 }
 
 code {

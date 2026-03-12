@@ -1,68 +1,51 @@
 # ScreenExplain
 
-ScreenExplain is a Windows desktop app for quick on-screen AI help.
+ScreenExplain is a Windows desktop app that captures a screen region and returns a short answer.
 
-The app is built around `quick mode`:
-- stays available from the system tray
-- captures a dragged region on the current monitor
-- shows a short answer bubble near the selected area
-- stores recent answers in the settings panel
+The current public architecture is:
 
-## Current Product Shape
+- `ScreenExplain.exe`
+- local Electron/Node bridge
+- optional remote WordPress approval backend
+- OpenAI Responses API
 
-- Quick mode is the default workflow.
-- The main window is now a settings and history panel.
-- Old manual screen-share / detailed analysis flow has been removed.
+## Product shape
 
-## Main Features
+- tray-first desktop workflow
+- quick capture with `Ctrl+Shift+S`
+- main panel reopen with `Ctrl+Shift+M`
+- overlay answer bubble near the captured area
+- recent answer history in the main panel
+- configurable model and prompt
+- remote approval flow for distributed users
 
-- System tray based quick mode
-- Global shortcut capture: `Ctrl+Shift+S`
-- Return to main panel: `Ctrl+Shift+M`
-- Region-based answer bubble overlay
-- Saved prompt applied to every capture
-- OpenAI API key saved locally for the current Windows user
-- Model selection
-- Token usage summary
-- Recent answer history, including quick mode answers
+## Auth modes
 
-## Run Locally
+The app supports two backend modes:
+
+1. direct OpenAI mode
+   - a user stores their own OpenAI API key locally
+2. remote approval mode
+   - the desktop app sends an approval request
+   - a WordPress admin approves or blocks the user
+   - the app then receives a user session automatically
+
+The approval backend source is included in:
+
+- `wordpress-plugin/`
+
+## Run locally
 
 ```powershell
 npm install
 npm start
 ```
 
-## OpenAI Setup
+To run only the local bridge:
 
-Use the `OpenAI 연결` section inside the app:
-
-1. Enter your API key
-2. Click `키 저장`
-3. Optionally click `연결 테스트`
-
-The API key is stored locally using Windows user-scoped protection.
-
-## Quick Mode
-
-Default usage flow:
-
-1. Launch the app
-2. Enable quick mode if needed
-3. Press `Ctrl+Shift+S`
-4. Drag over the area you want to analyze
-5. Read the answer bubble
-6. Right-click or press `Esc` to close the overlay
-
-Quick mode answers are also written into `최근 답변`.
-
-## Saved Prompt
-
-The `저장 프롬프트` section defines the instruction that is always combined with each capture.
-
-If the saved prompt is empty, the app uses its built-in default prompt:
-
-`이 화면에서 사용자가 지금 바로 알아야 할 핵심 내용을 짧고 정확하게 설명해줘. 문제 풀이처럼 보이면 정답과 핵심 근거를 먼저 말해줘.`
+```powershell
+npm run start:web
+```
 
 ## Build
 
@@ -78,13 +61,29 @@ Installer EXE:
 npm run dist:installer
 ```
 
-Build outputs are created in `dist/`.
+Build output is written to `dist/`.
 
-## Important Local Files
+## Local runtime data
+
+Runtime-only data is stored locally and is not committed:
+
+- `.local/`
+- API keys and remote session data
+- recent local settings
+
+## Important files
 
 - `electron-main.js`: Electron main process
-- `app.js`: settings panel UI logic
-- `overlay.js`: quick mode overlay interaction
-- `server.js`: local API bridge to OpenAI Responses API
-- `secure-store.js`: encrypted local API key storage
-- `settings-store.js`: local app settings storage
+- `app.js`: main panel UI logic
+- `overlay.js`: overlay answer UI
+- `server.js`: local bridge and remote approval client
+- `secure-store.js`: local encrypted secret storage
+- `settings-store.js`: local settings persistence
+- `wordpress-plugin/`: WordPress backend for approval and remote analysis
+
+## Security notes
+
+- no production secrets should be committed
+- runtime keys are expected through local storage or environment variables
+- the public repo excludes local state, build outputs, and deployment handoff notes
+- if you deploy the WordPress backend, store the OpenAI API key only in WordPress admin settings

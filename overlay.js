@@ -1,6 +1,7 @@
 const selectionBox = document.getElementById("selectionBox");
 const loadingBadge = document.getElementById("loadingBadge");
 const subtitleBubble = document.getElementById("subtitleBubble");
+const answerFormatter = window.ScreenExplainAnswerFormat;
 
 let dragStart = null;
 let dragCurrent = null;
@@ -58,7 +59,9 @@ async function completeSelection() {
 
   try {
     const result = await window.screenExplainOverlay.submitSelection(rect);
-    subtitleBubble.textContent = result.answer;
+    subtitleBubble.innerHTML = answerFormatter
+      ? answerFormatter.renderAnswerHtml(result.answer)
+      : result.answer;
     positionNearSelection(subtitleBubble, rect);
     subtitleBubble.hidden = false;
     loadingBadge.hidden = true;

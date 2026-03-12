@@ -9,6 +9,7 @@ const {
   nativeImage,
   screen,
   session,
+  shell,
   Tray,
 } = require("electron");
 const path = require("path");
@@ -16,6 +17,7 @@ const { PORT, startServer } = require("./server");
 
 const QUICK_CAPTURE_SHORTCUT = "CommandOrControl+Shift+S";
 const SHOW_MAIN_SHORTCUT = "CommandOrControl+Shift+M";
+const TOGGLE_QUICK_MODE_SHORTCUT = "CommandOrControl+Shift+Q";
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -53,6 +55,7 @@ function notifyQuickModeChanged() {
       quickModeEnabled,
       captureShortcut: "Ctrl+Shift+S",
       showMainShortcut: "Ctrl+Shift+M",
+      toggleShortcut: "Ctrl+Shift+Q",
     });
   }
 }
@@ -283,6 +286,7 @@ function registerIpcHandlers() {
     quickModeEnabled,
     captureShortcut: "Ctrl+Shift+S",
     showMainShortcut: "Ctrl+Shift+M",
+    toggleShortcut: "Ctrl+Shift+Q",
   }));
   ipcMain.handle("screen-explain:enable-quick-mode", async () => {
     setQuickModeEnabled(true);
@@ -295,6 +299,14 @@ function registerIpcHandlers() {
     return { ok: true, quickModeEnabled };
   });
   ipcMain.handle("screen-explain:start-quick-capture", startQuickCapture);
+  ipcMain.handle("screen-explain:open-external", async (_event, targetUrl) => {
+    if (typeof targetUrl !== "string" || !targetUrl.trim()) {
+      throw new Error("A URL is required.");
+    }
+
+    await shell.openExternal(targetUrl.trim());
+    return { ok: true };
+  });
   ipcMain.handle("screen-explain:overlay-cancel", async () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.close();
@@ -308,6 +320,17 @@ function registerIpcHandlers() {
 }
 
 function registerGlobalShortcuts() {
+  globalShortcut.register(TOGGLE_QUICK_MODE_SHORTCUT, () => {
+    if (quickModeEnabled) {
+      setQuickModeEnabled(false);
+      showMainWindow();
+      return;
+    }
+
+    setQuickModeEnabled(true);
+    hideMainWindow();
+  });
+
   globalShortcut.register(QUICK_CAPTURE_SHORTCUT, () => {
     if (quickModeEnabled) {
       startQuickCapture().catch((error) => {

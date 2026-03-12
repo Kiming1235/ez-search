@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .local/
+cafe24-api/
+SESSION_HANDOFF_*.md
+tmp-server-*.log
 *.exe
 *.blockmap
 builder-debug.yml
