@@ -79,7 +79,10 @@ const KOREAN_DEFAULT_PROMPT = [
 const DEFAULT_MODEL = persistedSettings.model || process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const DEFAULT_PROMPT = KOREAN_DEFAULT_PROMPT;
 const DEFAULT_PROBLEM_SOLVING_MODEL = process.env.OPENAI_PROBLEM_SOLVING_MODEL || "gpt-5-mini";
-const DEFAULT_REMOTE_API_URL = process.env.SCREENEXPLAIN_REMOTE_API_URL || "";
+const APPROVAL_ONLY_BUILD = process.env.SCREENEXPLAIN_APPROVAL_ONLY !== "false";
+const PRODUCTION_REMOTE_API_URL = "https://daehancargocrane.com/wp-json/screenexplain/v1/proxy";
+const DEFAULT_REMOTE_API_URL = process.env.SCREENEXPLAIN_REMOTE_API_URL
+  || (APPROVAL_ONLY_BUILD ? PRODUCTION_REMOTE_API_URL : "");
 
 const SUPPORTED_MODELS = [
   { id: "gpt-4.1-mini", label: "GPT-4.1 mini", contextWindow: 1047576, maxOutputTokens: 32768 },
@@ -99,7 +102,7 @@ const mimeTypes = {
 const API_MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let currentModel = DEFAULT_MODEL;
-let currentApiKey = process.env.OPENAI_API_KEY || loadApiKey();
+let currentApiKey = APPROVAL_ONLY_BUILD ? "" : (process.env.OPENAI_API_KEY || loadApiKey());
 let currentRemoteApiUrl = normalizeRemoteApiUrl(persistedSettings.remoteApiUrl || DEFAULT_REMOTE_API_URL);
 let currentRemoteApiToken = process.env.SCREENEXPLAIN_REMOTE_API_TOKEN || loadRemoteApiToken();
 let currentRemoteRequestToken = loadRemoteRequestToken();
@@ -1050,8 +1053,26 @@ function hasRemoteApiConfigured() {
   return Boolean(currentRemoteApiUrl && currentRemoteApiToken);
 }
 
+function shouldUseRemoteApi() {
+  if (APPROVAL_ONLY_BUILD) {
+    return Boolean(currentRemoteApiUrl);
+  }
+
+  return hasRemoteApiConfigured();
+}
+
 function getActiveBackendMode() {
-  return hasRemoteApiConfigured() ? "remote" : "openai";
+  if (shouldUseRemoteApi()) {
+    if (currentRemoteApiToken) {
+      return "remote";
+    }
+    if (currentRemoteApprovalRequest) {
+      return "remote-pending";
+    }
+    return "remote-ready";
+  }
+
+  return "openai";
 }
 
 function getModelMeta(model) {
@@ -1168,7 +1189,7 @@ async function analyzeScreen({
   mode = "default",
   modelOverride = "",
 }) {
-  if (hasRemoteApiConfigured()) {
+  if (shouldUseRemoteApi()) {
     return analyzeWithRemoteApi({
       imageDataUrl,
       promptText,
@@ -1377,7 +1398,7 @@ async function analyzeScreen({
 }
 
 async function testApiKey() {
-  if (currentRemoteApiUrl) {
+  if (shouldUseRemoteApi()) {
     return testRemoteApi();
   }
 
@@ -1481,6 +1502,16 @@ function requestHandler(req, res) {
 
         if (hasRemoteApiUrl && typeof body.remoteApiUrl === "string" && body.remoteApiUrl.trim() && !nextRemoteApiUrl) {
           sendJson(res, 400, { error: "Remote API URL is invalid." });
+          return;
+        }
+
+        if (APPROVAL_ONLY_BUILD && (nextApiKey !== null || clearStoredKey)) {
+          sendJson(res, 403, { error: "Local OpenAI key settings are disabled in this build." });
+          return;
+        }
+
+        if (APPROVAL_ONLY_BUILD && (hasRemoteApiUrl || nextRemoteApiToken !== null || clearStoredRemoteApiToken)) {
+          sendJson(res, 403, { error: "Remote approval settings are fixed in this build." });
           return;
         }
 
