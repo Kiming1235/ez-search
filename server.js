@@ -83,6 +83,9 @@ const APPROVAL_ONLY_BUILD = process.env.SCREENEXPLAIN_APPROVAL_ONLY !== "false";
 const PRODUCTION_REMOTE_API_URL = "https://daehancargocrane.com/wp-json/screenexplain/v1/proxy";
 const DEFAULT_REMOTE_API_URL = process.env.SCREENEXPLAIN_REMOTE_API_URL
   || (APPROVAL_ONLY_BUILD ? PRODUCTION_REMOTE_API_URL : "");
+const INITIAL_REMOTE_API_URL = APPROVAL_ONLY_BUILD
+  ? normalizeRemoteApiUrl(DEFAULT_REMOTE_API_URL)
+  : normalizeRemoteApiUrl(persistedSettings.remoteApiUrl || DEFAULT_REMOTE_API_URL);
 
 const SUPPORTED_MODELS = [
   { id: "gpt-4.1-mini", label: "GPT-4.1 mini", contextWindow: 1047576, maxOutputTokens: 32768 },
@@ -103,7 +106,7 @@ const API_MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let currentModel = DEFAULT_MODEL;
 let currentApiKey = APPROVAL_ONLY_BUILD ? "" : (process.env.OPENAI_API_KEY || loadApiKey());
-let currentRemoteApiUrl = normalizeRemoteApiUrl(persistedSettings.remoteApiUrl || DEFAULT_REMOTE_API_URL);
+let currentRemoteApiUrl = INITIAL_REMOTE_API_URL;
 let currentRemoteApiToken = process.env.SCREENEXPLAIN_REMOTE_API_TOKEN || loadRemoteApiToken();
 let currentRemoteRequestToken = loadRemoteRequestToken();
 let currentRemoteTokenKind = normalizeRemoteTokenKind(
@@ -640,8 +643,7 @@ async function createRemoteAnalysis(payload, allowRetry = true) {
       }
       throw new Error("Remote login expired. Request approval again.");
     }
-    const message = json?.error || `Remote API error (${response.status})`;
-    throw new Error(message);
+    throw createRemoteApiError(response, json, currentRemoteApiUrl);
   }
 
   return json;
@@ -661,8 +663,7 @@ async function fetchRemoteHealth() {
   const json = await response.json().catch(() => ({}));
 
   if (!response.ok || json?.ok !== true) {
-    const message = json?.error || `Remote API error (${response.status})`;
-    throw new Error(message);
+    throw createRemoteApiError(response, json, currentRemoteApiUrl);
   }
 
   return json;
@@ -751,8 +752,7 @@ async function submitRemoteApprovalRequest({ name = "", email = "", note = "", d
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok || !json?.ok || !json?.requestId) {
-    const message = json?.error || `Remote API error (${response.status})`;
-    throw new Error(message);
+    throw createRemoteApiError(response, json, endpoints.requestAccessUrl);
   }
 
   if (typeof json.requestToken === "string" && json.requestToken.trim()) {
@@ -793,8 +793,7 @@ async function fetchRemoteApprovalStatus({ autoIssueSession = false, health = nu
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok || !json?.ok) {
-    const message = json?.error || `Remote API error (${response.status})`;
-    throw new Error(message);
+    throw createRemoteApiError(response, json, endpoints.requestStatusUrl);
   }
 
   setRemoteApprovalRequest({
@@ -842,8 +841,7 @@ async function issueRemoteSessionFromApproval({ health = null } = {}) {
   });
   const json = await response.json().catch(() => ({}));
   if (!response.ok || !json?.ok || !json?.token) {
-    const message = json?.error || `Remote API error (${response.status})`;
-    throw new Error(message);
+    throw createRemoteApiError(response, json, endpoints.issueSessionUrl);
   }
 
   setRemoteAuthSession({
@@ -1047,6 +1045,18 @@ function normalizeRemoteApiUrl(url) {
   } catch {
     return "";
   }
+}
+
+function createRemoteApiError(response, json, targetUrl = "") {
+  if (response.status === 404) {
+    const failedUrl = typeof targetUrl === "string" && targetUrl.trim()
+      ? targetUrl.trim()
+      : currentRemoteApiUrl || "remote server";
+    return new Error(`Remote API endpoint was not found (404): ${failedUrl}`);
+  }
+
+  const message = json?.error || `Remote API error (${response.status})`;
+  return new Error(message);
 }
 
 function hasRemoteApiConfigured() {
