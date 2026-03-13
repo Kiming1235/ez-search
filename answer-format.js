@@ -1,14 +1,5 @@
 (function attachAnswerFormatter() {
-  const KOREAN_RANGE = "\\uAC00-\\uD7A3";
-  const INLINE_TOKEN = `A-Za-z${KOREAN_RANGE}0-9()[\\].,%`;
-  const SIMPLE_MATH_RE = new RegExp(
-    `^(?:\\b(?:sin|cos|tan|log|ln)\\b\\s*\\([^)]*\\)|[${INLINE_TOKEN}]+(?:\\s*[=+\\-\\u00D7\\u00F7*/^\\u221A\\u2211\\u222B<>\\u2264\\u2265\\u2248\\u2192]\\s*[${INLINE_TOKEN}]+)+)$`,
-  );
   const DISPLAY_MATH_RE = new RegExp("^\\s*(?:\\$\\$.*\\$\\$|\\\\\\[.*\\\\\\]|\\$.*\\$|\\\\frac\\{|.+\\/\\s*\\u221A)");
-  const PLAIN_FRACTION_RE = new RegExp(
-    `((?:\\([^()\\n]+\\)|[A-Za-z${KOREAN_RANGE}0-9.%]+(?:\\s*[+\\-\\u00D7*]\\s*[A-Za-z${KOREAN_RANGE}0-9.%]+)*))\\s*\\/\\s*((?:\\u221A\\s*\\([^()\\n]+\\)|\\([^()\\n]+\\)|[A-Za-z${KOREAN_RANGE}0-9.%\\u00B2\\u00B3]+(?:\\s*[+\\-\\u00D7*]\\s*[A-Za-z${KOREAN_RANGE}0-9.%\\u00B2\\u00B3]+)*))`,
-    "g",
-  );
   const LATEX_COMMAND_MAP = {
     alpha: "α",
     beta: "β",
@@ -338,29 +329,6 @@
     return segments;
   }
 
-  function splitMathFromText(text) {
-    const segments = [];
-    let lastIndex = 0;
-    text.replace(PLAIN_FRACTION_RE, (match, _num, _den, offset) => {
-      if (offset > lastIndex) {
-        segments.push({ type: "text", value: text.slice(lastIndex, offset) });
-      }
-      segments.push({ type: "math", value: match, display: false });
-      lastIndex = offset + match.length;
-      return match;
-    });
-
-    if (!segments.length) {
-      return [{ type: "text", value: text }];
-    }
-
-    if (lastIndex < text.length) {
-      segments.push({ type: "text", value: text.slice(lastIndex) });
-    }
-
-    return segments;
-  }
-
   function formatInlineText(line) {
     const explicitSegments = tokenizeLine(line);
     const htmlParts = [];
@@ -371,14 +339,7 @@
         continue;
       }
 
-      const mixed = splitMathFromText(segment.value);
-      for (const item of mixed) {
-        if (item.type === "math" || SIMPLE_MATH_RE.test(item.value.trim())) {
-          htmlParts.push(renderMathBlock(item.value, false));
-        } else {
-          htmlParts.push(escapeHtml(item.value));
-        }
-      }
+      htmlParts.push(escapeHtml(segment.value));
     }
 
     return htmlParts.join("");
