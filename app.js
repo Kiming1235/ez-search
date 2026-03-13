@@ -195,6 +195,10 @@ function syncApprovalForm() {
   requestNoteInput.value = remoteApprovalRequest.note || "";
 }
 
+function normalizeEmailValue(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
 function renderRemoteAuthState(data) {
   remoteTokenKind = data?.remoteTokenKind || "";
   remoteAuthUser = data?.remoteAuthUser || null;
@@ -797,9 +801,32 @@ async function submitAccessRequest() {
   const name = requestNameInput.value.trim();
   const email = requestEmailInput.value.trim();
   const note = requestNoteInput.value.trim();
+  const normalizedEmail = normalizeEmailValue(email);
+  const storedRequestEmail = normalizeEmailValue(remoteApprovalRequest?.email);
+  const approvedEmail = normalizeEmailValue(remoteAuthUser?.email);
 
   if (!email) {
     remoteAuthHint.textContent = "이메일은 필수입니다.";
+    return;
+  }
+
+  if (remoteTokenKind === "user-session" && normalizedEmail && normalizedEmail === approvedEmail) {
+    remoteAuthHint.textContent = "이미 승인된 기기입니다. 바로 사용할 수 있습니다.";
+    return;
+  }
+
+  if (remoteApprovalRequest?.requestId && normalizedEmail && normalizedEmail === storedRequestEmail) {
+    if (remoteApprovalRequest.status === "approved") {
+      remoteAuthHint.textContent = "이미 승인된 요청입니다. 상태 확인 후 바로 사용할 수 있습니다.";
+      return;
+    }
+
+    if (remoteApprovalRequest.status === "blocked") {
+      remoteAuthHint.textContent = "이 이메일의 요청은 현재 차단 상태입니다.";
+      return;
+    }
+
+    remoteAuthHint.textContent = "이미 승인 요청을 보냈습니다.";
     return;
   }
 
