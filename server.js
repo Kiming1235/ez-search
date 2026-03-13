@@ -78,6 +78,7 @@ const KOREAN_DEFAULT_PROMPT = [
 
 const DEFAULT_MODEL = persistedSettings.model || process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const DEFAULT_PROMPT = KOREAN_DEFAULT_PROMPT;
+const PROMPT_APPEND_MARKER = "\n\n[추가 지시]\n";
 const DEFAULT_PROBLEM_SOLVING_MODEL = process.env.OPENAI_PROBLEM_SOLVING_MODEL || "gpt-5-mini";
 const APPROVAL_ONLY_BUILD = process.env.SCREENEXPLAIN_APPROVAL_ONLY !== "false";
 const PRODUCTION_REMOTE_API_URL = "https://daehancargocrane.com/wp-json/screenexplain/v1/proxy";
@@ -135,7 +136,23 @@ function normalizeSavedPrompt(promptText) {
 
 function getCustomPrompt(promptText = savedPrompt) {
   const text = typeof promptText === "string" ? promptText.trim() : "";
-  return isBuiltInPrompt(text) ? "" : text;
+  if (isBuiltInPrompt(text)) {
+    return "";
+  }
+
+  const combinedPrefix = `${DEFAULT_PROMPT}${PROMPT_APPEND_MARKER}`;
+  if (text.startsWith(combinedPrefix)) {
+    return text.slice(combinedPrefix.length).trim();
+  }
+
+  return text;
+}
+
+function resolveAdditionalPrompt(customPrompt) {
+  const candidate = typeof customPrompt === "string" && customPrompt.trim()
+    ? customPrompt.trim()
+    : savedPrompt;
+  return getCustomPrompt(candidate);
 }
 
 function normalizeRecentHistory(items) {
@@ -922,9 +939,10 @@ async function analyzeWithRemoteApi({
   mode = "default",
   modelOverride = "",
 }) {
+  const additionalPrompt = resolveAdditionalPrompt(promptText);
   const resolvedPrompt = resolvePrompt(promptText);
   const taskTags = detectTaskTags({
-    promptText: resolvedPrompt,
+    promptText: additionalPrompt,
     questionText,
     instructionText,
     mode,
@@ -951,7 +969,7 @@ async function analyzeWithRemoteApi({
   return {
     answer,
     model: resolvedModel,
-    promptText: getCustomPrompt(resolvedPrompt),
+    promptText: additionalPrompt,
     usage: buildUsageSummary({ usage: json?.usage || {} }, resolvedModel),
   };
 }
@@ -1112,7 +1130,10 @@ function buildUsageSummary(responseJson, model) {
 }
 
 function resolvePrompt(customPrompt) {
-  return customPrompt && customPrompt.trim() ? customPrompt.trim() : savedPrompt || DEFAULT_PROMPT;
+  const additionalPrompt = resolveAdditionalPrompt(customPrompt);
+  return additionalPrompt
+    ? `${DEFAULT_PROMPT}${PROMPT_APPEND_MARKER}${additionalPrompt}`
+    : DEFAULT_PROMPT;
 }
 
 function resolveModelForRequest(mode, modelOverride, taskTags = []) {
@@ -1154,13 +1175,13 @@ function buildTaskGuidance(taskTags) {
   return guidance.join(" ");
 }
 
-function buildSystemInstruction(mode, promptText, taskTags) {
+function buildSystemInstruction(mode, additionalPrompt, taskTags) {
   const shared = [
     "당신은 현재 화면을 바탕으로 답하는 ScreenExplain 보조 도우미입니다.",
     "답변은 화면에 실제로 보이거나 이미지에서 직접 추론 가능한 내용에만 근거합니다.",
     "이미지가 흐리거나 잘려 있거나 불완전하면 추측하지 말고 부족한 부분을 말합니다.",
     `작업 지침: ${buildTaskGuidance(taskTags)}`,
-    `사용자 추가 프롬프트: ${promptText}`,
+    `사용자 추가 프롬프트: ${additionalPrompt || "없음"}`,
   ];
 
   if (mode === "quick") {
@@ -1218,16 +1239,17 @@ async function analyzeScreen({
     throw new Error("imageDataUrl must be a data:image URL.");
   }
 
+  const additionalPrompt = resolveAdditionalPrompt(promptText);
   const resolvedPrompt = resolvePrompt(promptText);
   const taskTags = detectTaskTags({
-    promptText: resolvedPrompt,
+    promptText: additionalPrompt,
     questionText,
     instructionText,
     mode,
   });
   const requestModel = resolveModelForRequest(mode, modelOverride, taskTags);
   const runtimeInstruction = typeof instructionText === "string" && instructionText.trim() ? instructionText.trim() : "";
-  const baseInstruction = buildSystemInstruction(mode, resolvedPrompt, taskTags);
+  const baseInstruction = buildSystemInstruction(mode, additionalPrompt, taskTags);
   const systemInstruction = runtimeInstruction
     ? `${baseInstruction} Additional runtime instruction: ${runtimeInstruction}`
     : baseInstruction;
@@ -1402,7 +1424,7 @@ async function analyzeScreen({
   return {
     answer,
     model: resolvedModel,
-    promptText: getCustomPrompt(resolvedPrompt),
+    promptText: additionalPrompt,
     usage: buildUsageSummaryFromResponses(responseChain, resolvedModel),
   };
 }
