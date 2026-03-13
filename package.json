@@ -36,6 +36,7 @@
       "secure-store.js",
       "server.js",
       "settings-store.js",
+      "store-path.js",
       "styles.css",
       "package.json"
     ],

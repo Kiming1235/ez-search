@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { getStoreDir } = require("./store-path");
 
-const STORE_DIR = path.join(__dirname, ".local");
+const STORE_DIR = getStoreDir();
 const STORE_PATH = path.join(STORE_DIR, "settings.json");
 
 function ensureStoreDir() {

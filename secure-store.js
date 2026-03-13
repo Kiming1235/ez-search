@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { getStoreDir } = require("./store-path");
 
-const STORE_DIR = path.join(__dirname, ".local");
+const STORE_DIR = getStoreDir();
 const DEFAULT_SECRET_NAME = "api-key";
 const SAFE_STORAGE_PREFIX = Buffer.from("SAFE1:");
 const PLAINTEXT_PREFIX = Buffer.from("PLAIN1:");
