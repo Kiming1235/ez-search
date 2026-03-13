@@ -18,6 +18,9 @@ const { PORT, startServer } = require("./server");
 const QUICK_CAPTURE_SHORTCUT = "CommandOrControl+Shift+S";
 const SHOW_MAIN_SHORTCUT = "CommandOrControl+Shift+M";
 const TOGGLE_QUICK_MODE_SHORTCUT = "CommandOrControl+Shift+Q";
+const MAX_QUICK_IMAGE_DATA_URL_LENGTH = 120000;
+const QUICK_IMAGE_MAX_EDGE = 1400;
+const QUICK_IMAGE_MIN_EDGE = 480;
 
 let mainWindow = null;
 let overlayWindow = null;
@@ -64,6 +67,54 @@ function notifyQuickAnswer(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("screen-explain:quick-answer", payload);
   }
+}
+
+function imageToJpegDataUrl(image, quality) {
+  return `data:image/jpeg;base64,${image.toJPEG(quality).toString("base64")}`;
+}
+
+function constrainImageSize(image, maxEdge) {
+  const size = image.getSize();
+  const width = Math.max(size.width || 1, 1);
+  const height = Math.max(size.height || 1, 1);
+  const longestEdge = Math.max(width, height);
+  if (longestEdge <= maxEdge) {
+    return image;
+  }
+
+  const scale = maxEdge / longestEdge;
+  return image.resize({
+    width: Math.max(Math.round(width * scale), 1),
+    height: Math.max(Math.round(height * scale), 1),
+  });
+}
+
+function optimizeQuickCaptureImage(image) {
+  let working = constrainImageSize(image, QUICK_IMAGE_MAX_EDGE);
+  let quality = 82;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const dataUrl = imageToJpegDataUrl(working, quality);
+    if (dataUrl.length <= MAX_QUICK_IMAGE_DATA_URL_LENGTH) {
+      return dataUrl;
+    }
+
+    if (quality > 50) {
+      quality -= 12;
+      continue;
+    }
+
+    const size = working.getSize();
+    const longestEdge = Math.max(size.width || 1, size.height || 1);
+    if (longestEdge <= QUICK_IMAGE_MIN_EDGE) {
+      break;
+    }
+
+    working = constrainImageSize(working, Math.max(Math.round(longestEdge * 0.8), QUICK_IMAGE_MIN_EDGE));
+    quality = 72;
+  }
+
+  return imageToJpegDataUrl(working, Math.max(quality, 40));
 }
 
 function setQuickModeEnabled(nextValue) {
@@ -186,7 +237,7 @@ async function captureSelectionFromDisplay(selectionBounds) {
     throw new Error("선택한 영역을 캡처하지 못했습니다.");
   }
 
-  return image.toDataURL();
+  return optimizeQuickCaptureImage(image);
 }
 
 async function analyzeQuickSelection(selectionBounds) {
